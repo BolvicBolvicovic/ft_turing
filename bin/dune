@@ -1,0 +1,4 @@
+(executable
+ (public_name ft_turing)
+ (name main)
+ (libraries ft_turing))

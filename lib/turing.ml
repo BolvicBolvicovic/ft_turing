@@ -6,6 +6,7 @@ end)
 
 module type INPUT = sig
         type transition = string * string * string * string
+        val name : string
         val alphabet : string list
         val blank : string
         val states : string list
@@ -16,34 +17,30 @@ end
 
 module type Machine = sig
 
-        type action =
-                | LEFT
-                | RIGHT
         type transition = string * string * string * string
         type state = string
 
+        val name : string
         val alphabet : string list
         val blank : string
         val states : state list
         val initial : state
         val finals : state list
         val transitions : (transition array) StateHashtbl.t
+
+        val print_machine : unit -> unit
         val execute : string -> unit
         val compute : string -> state -> int -> unit
         val process : string -> state -> int -> string * state * int  
 
 end
 
-module type MAKE = functor (I: INPUT) -> Machine
-
-module Make : MAKE = functor (I: INPUT) -> struct
+module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
         
-        type action =
-                | LEFT
-                | RIGHT
         type transition = string * string * string * string
         type state = string
 
+        let name = I.name
         let alphabet = I.alphabet
         let blank = I.blank
         let states = I.states
@@ -51,9 +48,9 @@ module Make : MAKE = functor (I: INPUT) -> struct
         let finals = I.finals
         let transitions = I.transitions
         let process str_input state head =
-                let formated_str = String.fold_left (fun acc element -> acc @ if List.length acc - 1 = head then ['<';element;'>'] else [element]) [] str_input in
-                let formated_str = "[" ^ String.of_seq (List.to_seq formated_str) ^ "]" in
-                print_endline formated_str;
+                let formated_str = String.fold_left (fun acc element -> acc @ if List.length acc = head then ['<';element;'>'] else [element]) [] str_input in
+                let formated_str = "[" ^ String.of_seq (List.to_seq formated_str) ^ "] " in
+                print_string formated_str;
                 let read_head = String.make 1 str_input.[head] in
                 print_string ("(" ^ state ^ ", " ^ read_head ^ ") -> ");
                 let state_transition = StateHashtbl.find transitions state in
@@ -69,14 +66,30 @@ module Make : MAKE = functor (I: INPUT) -> struct
                         | "RIGHT" -> head + 1
                         | _ -> -1
                 in
-                let new_str = String.fold_left (fun acc element -> acc @ if List.length acc - 1 = head then [write.[0]] else [element]) [] str_input in
+                let new_str = String.fold_left (fun acc element -> acc @ if List.length acc = head then [write.[0]] else [element]) [] str_input in
                 let new_str = String.of_seq (List.to_seq new_str) in
                 print_endline ("(" ^ new_state ^ ", " ^ write ^ ", " ^ action ^ ")");
                 (new_str, new_state, new_head)
         let rec compute str_input state head = 
-                if List.exists (fun e -> e = state) finals then () 
+                if List.exists (fun e -> e = state) finals then print_endline ("Output: " ^ str_input) 
                 else
                         let (new_input, new_state, new_head) = process str_input state head in
                         compute new_input new_state new_head
         let execute str_input = compute str_input initial 0
+        let print_machine () =
+                print_endline ("********************************************************************************");
+                print_endline ("*                                                                              *");
+                print_endline ("*                               " ^ name ^ "                          *");
+                print_endline ("*                                                                              *");
+                print_endline ("********************************************************************************");
+                let print_elem str = print_string (str ^ "; ") in
+                print_string "Alphabet: [ "; List.iter print_elem alphabet; print_endline "]";
+                print_string "States  : [ "; List.iter print_elem states; print_endline "]";
+                print_endline ("Initial : " ^ initial);
+                print_string "Finals  : [ "; List.iter print_elem finals; print_endline "]";
+                StateHashtbl.iter 
+                        (fun key arr -> Array.iter 
+                                (fun (read, to_state, write, action) -> print_endline ("(" ^ key ^ ", " ^ read ^ ") -> (" ^ to_state ^ ", " ^ write ^ ", " ^ action ^ ")")) arr)
+                        transitions;
+                print_endline ("********************************************************************************");
 end
