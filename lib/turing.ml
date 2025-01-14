@@ -71,7 +71,7 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                 print_endline ("(" ^ new_state ^ ", " ^ write ^ ", " ^ action ^ ")");
                 (new_str, new_state, new_head)
         let rec compute str_input state head = 
-                if List.exists (fun e -> e = state) finals then print_endline ("Output: " ^ str_input) 
+                if List.exists (fun e -> e = state) finals then begin print_endline ("Output: " ^ str_input) end
                 else
                         let (new_input, new_state, new_head) = process str_input state head in
                         compute new_input new_state new_head
@@ -93,3 +93,39 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                         transitions;
                 print_endline ("********************************************************************************");
 end
+
+let from_input json_path =
+        let open Core in
+        let open Yojson.Basic.Util in
+        let json = Yojson.Basic.from_file json_path in
+        let name = json |> member "name" |> to_string in
+        let alphabet = json |> member "alphabet" |> to_list |> filter_string in
+        let blank = json |> member "blank" |> to_string in
+        let states = json |> member "states" |> to_list |> filter_string in
+        let initial = json |> member "initial" |> to_string in
+        let finals = json |> member "finals" |> to_list |> filter_string in
+        let transitions = json |> member "transitions" |> to_assoc in
+        let ht = StateHashtbl.create (List.length states) in
+        transitions |> List.iter ~f:(fun (state, transitions) ->
+                let transition_array =
+                        transitions |> to_list
+                        |> List.map ~f:(fun t ->
+                            let read = t |> member "read" |> to_string in
+                            let to_state = t |> member "to_state" |> to_string in
+                            let write = t |> member "write" |> to_string in
+                            let action = t |> member "action" |> to_string in
+                            (read, to_state, write, action))
+                        |> Array.of_list
+                      in
+                      StateHashtbl.add ht state transition_array);
+        let module Input : INPUT = struct 
+                type transition = string * string * string * string
+                let name = name
+                let alphabet = alphabet
+                let blank = blank
+                let states = states
+                let initial = initial
+                let finals = finals
+                let transitions = ht
+        end in
+        (module Input : INPUT)

@@ -1,1 +1,5 @@
-(library (name ft_turing)(modules turing))
+(library 
+  (name ft_turing)
+  (modules turing)
+  (libraries core yojson)
+)

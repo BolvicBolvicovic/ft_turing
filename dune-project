@@ -5,11 +5,11 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github BolvicBolvicovic/ft_turing))
 
-(authors "Author Name")
+(authors "Victor Cornille")
 
-(maintainers "Maintainer Name")
+(maintainers "Victor Cornille")
 
 (license LICENSE)
 
@@ -17,10 +17,10 @@
 
 (package
  (name ft_turing)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (synopsis "A Turing machine Turing complete")
+ (description "The 42 project ft_turing. The ft_turing project is functionnal implementation of a single infinite tape Turing machine.")
  (depends ocaml dune)
  (tags
-  (topics "to describe" your project)))
+  (topics "turing" your project)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
