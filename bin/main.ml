@@ -5,4 +5,4 @@ let () =
         let module Input = (val input_module : Turing.INPUT) in
         let module Machine = Turing.Make(Input) in
         Machine.print_machine ();
-        Machine.execute Sys.argv.(2);
+        Machine.execute (Sys.argv.(2) ^ Machine.blank);
