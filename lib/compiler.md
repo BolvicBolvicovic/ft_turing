@@ -121,6 +121,13 @@ foo:
 There are 5 registers of 32 bits encoded in hexadecimal: eax, ebx, ecx, edx.
 You can use a subroutine to read/write them.
 Avoid to use them since it will significantly increase the time complexity of your program.
+You can also store and compare integers. You can perform operations on them. Because registers are encoded in hexadecimal, integers are too.
+Example:
+```asm
+foo:
+    [0]     <- self mov eax int(5) then LEFT  and bar
+    [1]     <- self inc eax        then RIGHT and bar
+```
 
 ### Keywords
 
@@ -149,6 +156,11 @@ foo:
     [0]     <- self then RIGHT and bar
 ```
 Essentialy, a subroutine is generated to write on a the memory tape and then comes back to were we stoped
+
+##### inc, dec
+
+Both "inc" and "dec" keywords take one parameter: the register that is to be modified.
+This is interersting since you can use integers. You can increment and decrement them.
 
 ##### eq, true and false
 
