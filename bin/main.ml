@@ -14,7 +14,7 @@ let () =
                         if Sys.argv.(1) = "--help" then print_help () else invalid_arg "USAGE: ft_turing [OPTION] machine_name.json 'input_to_machine'"
                 end
                 | 3 -> begin 
-                        if Sys.argv.(1) = "-c" then print_endline "will compile soon"
+                        if Sys.argv.(1) = "-c" then Compiler.compile Sys.argv.(2)
                         else if String.ends_with ~suffix:".json" Sys.argv.(1) = true then begin
                                 let input_module = Turing.from_input Sys.argv.(1) in
                                 let module Input = (val input_module : Turing.INPUT) in
