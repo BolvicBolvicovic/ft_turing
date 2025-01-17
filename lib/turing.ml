@@ -31,7 +31,8 @@ module type Machine = sig
         val print_machine : unit -> unit
         val execute : string -> unit
         val compute : string -> state -> int -> unit
-        val process : string -> state -> int -> string * state * int  
+        val process : string -> state -> int -> string * state * int
+        val compile : string -> unit
 
 end
 
@@ -91,7 +92,9 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                         (fun key arr -> Array.iter 
                                 (fun (read, to_state, write, action) -> print_endline ("(" ^ key ^ ", " ^ read ^ ") -> (" ^ to_state ^ ", " ^ write ^ ", " ^ action ^ ")")) arr)
                         transitions;
-                print_endline ("********************************************************************************");
+                print_endline ("********************************************************************************")
+
+        let compile input = print_endline ("future_machine_description;" ^ input)
 end
 
 let from_input json_path =
