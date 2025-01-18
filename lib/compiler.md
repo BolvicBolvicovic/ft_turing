@@ -161,16 +161,22 @@ Essentialy, a subroutine is generated to write on a the memory tape and then com
 
 Both "inc" and "dec" keywords take one parameter: the register that is to be modified.
 This is interersting since you can use integers. You can increment and decrement them.
+Example:
+```asm
+foo:
+    [1]     <- 0    mov eax self then LEFT and bar
+    [0]     <- self dec eax then RIGHT and bar
+```
 
 ##### eq, true and false
 
 The "eq" keyword takes two parameter: the register that contains a value previously stored and the value that is to be compared with.
-It returns a boolean ("true" or "false") on which we can take action
+It returns a boolean (":true" or ":false") on which we can take action
 Example:
 ```asm
 foo:
-    [1]     <- 0    eq eax self : true then LEFT and bar else RIGHT and foo
-    [0]     <- self then RIGHT and bar
+    [1]     <- 0    eq   eax   self :true then LEFT and bar else RIGHT and foo
+    [0]     <- self then RIGHT and  bar
 ```
 As for mov, a subroutine is generated to compare with the input value.
 
