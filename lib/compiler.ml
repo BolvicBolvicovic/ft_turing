@@ -1,5 +1,3 @@
-type line = string * int
-
 type foundation =
         | Inputs of string
         | Assign_op
@@ -12,17 +10,34 @@ type foundation =
         | Null
 
 type operator =
-        | Assign of (foundation * foundation)                                   (* Inputs * Write *)
-        | Subroutine of (foundation * foundation * foundation)                  (* Callee * Register  * Null or Input or Int *)
-        | Eq of (foundation * foundation * foundation * operator * operator)    (* Callee * Register  * Input or Int * Routine * Routine *)
-        | Normal of (operator * operator)                                       (* Subroutine or Null * Routine *)
-        | Routine of (foundation * foundation)                                  (* Action * Callee *)
+        | Subroutine of (foundation * foundation * foundation)  (* Callee * Register  * Null or Input or Int *)
+        | Eq of (operator * foundation * operator * operator)   (* Callee * Register  * Input or Int * Routine * Routine *)
+        | Normal of (operator * operator)                       (* Subroutine or Null * Routine *)
+        | Routine of (foundation * foundation)                  (* Action * Callee *)
         | Null
 
-type expr =
-        | Func of (string * int * expr list)    (* name * starts_at * Line list *)
-        | Line of (operator * operator)         (* Assign * Eq or Normal *)
+type line = {
+        inputs : foundation;
+        write  : foundation;
+        next   : operator;
+}
+
+type func = {
+        name : string;
+        starts_at : int;
+        definition : (line * int) list;
+}
+
+type transition = string * (string * string) array list
         
+type tm_json = {
+        file_name : string;
+        alphabet : string array;
+        blank : string;
+        states : string array;
+        transitions : transition list;
+}
+
 
 let to_list file_name = 
         let trimmed_file = open_in file_name 
@@ -47,12 +62,7 @@ let to_list file_name =
         in
         (file_name, List.hd trimmed_file, List.tl trimmed_file)
 
-let print_expr (file_name, alphabet, functions) = 
-        print_endline ("Filename: " ^ file_name);
-        print_endline ("Alphabet: " ^ fst alphabet);
-        functions |> List.iter (fun (name, definition) -> print_endline ("Name: " ^ fst name); print_endline "Definition:"; definition |> List.iter (fun (str, _) -> print_endline str))
-
-let to_expr (file_name, alphabet, trimmed_file) =
+let to_funcs (file_name, alphabet, trimmed_file) =
         let func_names = List.filter (fun (line, _) -> String.ends_with ~suffix:":" line) trimmed_file in
         let split_list_on_func_names list =
                 let rec tail acc current = function
@@ -84,7 +94,8 @@ let to_expr (file_name, alphabet, trimmed_file) =
                         let tokenized_def = List.map (fun (line, i) ->
                                 let trimmed_line = line
                                         |> String.trim 
-                                        |> String.split_on_char ' ' in
+                                        |> String.split_on_char ' ' 
+                                        |> List.filter (fun str -> str <> "") in
                                 let new_line = trimmed_line
                                         |> List.mapi (fun j word -> match j with
                                                 | 0 -> if String.starts_with ~prefix:"[" word && String.ends_with ~suffix:"]" word then
@@ -157,30 +168,108 @@ let to_expr (file_name, alphabet, trimmed_file) =
                         (name, tokenized_def)
                 ) parsed_func
         in 
-        let parse_operator = List.map (fun (name, definition) ->
+        let parsed_operator = List.map (fun ((name, j), definition) ->
                 let parsed_def = List.map (fun (line, i) ->
-                                let operators = match List.length line with 
-                                | 7 -> ()
-                                | 9 -> ()
-                                | 10 -> ()
-                                | 15 -> ()
+                                let arr = Array.of_list line in
+                                let operators = match Array.length arr with 
+                                | 7 -> {
+                                        inputs = arr.(0);
+                                        write  = arr.(2);
+                                        next   = Normal (Null, Routine (arr.(4), arr.(6)))
+                                }
+                                | 9 -> {
+                                        inputs = arr.(0);
+                                        write  = arr.(2);
+                                        next   = Normal (Subroutine (arr.(3), arr.(4), Null), Routine (arr.(6), arr.(8)));
+                                }
+                                | 10 -> {
+                                        inputs = arr.(0);
+                                        write  = arr.(2);
+                                        next   = Normal (Subroutine (arr.(3), arr.(4), arr.(5)), Routine (arr.(7), arr.(9)))
+                                }
+                                | 15 -> {
+                                        inputs = arr.(0);
+                                        write  = arr.(2);
+                                        next   = Eq (Subroutine (arr.(3), arr.(4), arr.(5)), arr.(6), Routine (arr.(8), arr.(10)), Routine (arr.(12), arr.(14)))
+                                }
                                 | _      -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ string_of_int (List.length definition) ^ "' should not exists."))
                                 in (operators, i)
                 ) definition in
-                (name, parsed_def)
+                { name = String.sub (String.trim name) 0 (String.length (String.trim name)); starts_at = j; definition = parsed_def }
         ) tokenized_func
         in
-        (file_name, alphabet, parse_operator)
+        (file_name, alphabet, parsed_operator)
 
-        
 
-let to_json as_struct = print_expr as_struct; as_struct
 
-let to_file json_struct = print_expr json_struct
 
+let to_transitions (line, i) =
+        let inputs = match line.inputs with
+                | Inputs str -> String.fold_left (fun acc c -> String.make 1 c :: acc ) [] str
+                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
+        in
+        let state = match line.next with 
+                | Normal (Null, Routine (_, Callee state)) -> state
+                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect state"))
+        in
+        let write = match line.write with
+                | Write w -> w
+                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect write"))
+        in
+        let action = match line.next with 
+                | Normal (Null, Routine (Action action, _)) -> action
+                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect action"))
+        in
+        inputs |> List.map (fun input -> [|("read", input); ("to_state", state); ("write", write); ("action", action);|])
+
+let parse_func as_funcs = List.map (fun func -> (func.name, List.concat (List.map to_transitions func.definition))) as_funcs
+
+let to_tm_json (file_name, (alphabet, _), as_tree) = 
+        let parsed_alphabet = String.fold_left (fun acc c -> String.make 1 c :: acc ) [] alphabet |> List.rev in
+        let parsed_state_names = List.map (fun func -> func.name) as_tree in
+        let parsed_transitions = parse_func as_tree in
+        {
+                file_name = file_name;
+                alphabet = Array.of_list parsed_alphabet;
+                blank = List.hd parsed_alphabet;
+                states = Array.of_list parsed_state_names;
+                transitions = parsed_transitions;
+        }
+
+let to_file tm_json =
+        let string_of_array (arr: string array) = 
+                let new_string = Array.fold_left (fun acc str -> acc ^ "'" ^ str ^ "', ") "" arr in
+                String.sub new_string 0 (String.length new_string - 2)
+        in
+        let string_of_transition (name, definition) =
+"'" ^ name ^ "' : {
+                " ^ (let new_list = List.map (fun arr -> "{ 'read' : '" ^ snd arr.(0) ^ "', 'to_state' : '" ^ snd arr.(1) ^ "', 'write' : '" ^ snd arr.(2) ^ "', 'action' : '" ^ snd arr.(3) ^ "' }, ") definition in
+                        let new_string = List.fold_left (fun acc str -> acc ^ str) "" new_list in
+                        print_endline ("For " ^ name ^ ": new_string: <" ^ new_string ^ ">");
+                        String.sub new_string 0 (String.length new_string - 2)
+                ) ^ "
+        }, "
+in
+
+"{
+        'name'          : '" ^ tm_json.file_name ^ "',
+        'alphabet'      : [" ^ string_of_array tm_json.alphabet ^ "],
+        'blank'         : '" ^ tm_json.blank ^ "',
+        'states'        : [" ^ string_of_array tm_json.states ^ "],
+        'initial'       : '_start',
+        'finals'        : ['HALT'],
+        'transitions'   : {
+                " ^ (let new_string =
+                        List.map string_of_transition tm_json.transitions |> List.fold_left (fun acc str -> acc ^ str) "" in
+                        String.sub new_string 0 (String.length new_string - 2)
+                )                        
+                ^ "
+        }
+}"
 
 let compile file_name = file_name 
         |> to_list 
-        |> to_expr 
-        |> to_json 
+        |> to_funcs
+        |> to_tm_json 
         |> to_file
+        |> print_endline
