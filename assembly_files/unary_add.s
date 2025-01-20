@@ -1,8 +1,8 @@
 # This is a test 
 alphabet[.1+]
 # And that is a new comment
-_start:
-    [1+] <- 1 then RIGHT and _start
+_start_mem:
+    [1+] <- 1 then RIGHT and _start_mem
     [.]  <- . then LEFT and delone
 
 delone:

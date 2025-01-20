@@ -20,7 +20,8 @@ let () =
                                 let module Input = (val input_module : Turing.INPUT) in
                                 let module Machine = Turing.Make(Input) in
                                 Machine.print_machine ();
-                                Machine.execute (Sys.argv.(2) ^ Machine.blank)
+                                let b = Machine.blank in
+                                Machine.execute (Sys.argv.(2) ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b ^ b)
                         end else invalid_arg "USAGE: ft_turing [OPTION] machine_name.json 'input_to_machine'"
                 end
                 | 4 -> begin

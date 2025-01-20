@@ -112,13 +112,13 @@ foo:
 2. The operator "<-" is the assignment operator.
 3. The value that is assigned to the input.
 4. "then" keyword. Just a convenient way of describing what is happening. Acts as a separator.
-5. Action of the head before next function call. Can be either "LEFT", "RIGHT" or "STILL" (avoid using "STILL" since it significantly increases the time complexity of your program).
+5. Action of the head before next function call. Can be either "LEFT", "RIGHT".
 6. "and" keyword. Just like "then", acts as a separator.
 7. Function call with the name of the callee.
 
 ### Registers
 
-There are 5 registers of 32 bits encoded in hexadecimal: eax, ebx, ecx, edx.
+There are 4 registers of 32 bits encoded in hexadecimal: eax, ebx, ecx, edx.
 You can use a subroutine to read/write them.
 Avoid to use them since it will significantly increase the time complexity of your program.
 You can also store and compare integers. You can perform operations on them. Because registers are encoded in hexadecimal, integers are too.
@@ -145,6 +145,19 @@ Though, this syntax is mandatory for most lines of codes. See next section for s
 
 Using these keywords has huge overhead. The reason is that it has to interact with another tape (the memory tape).
 Since we need to simulate this other tape, this operation is increasing the amount of actions that have to be done by a lot.
+
+##### Special _start_mem
+
+If you intend to use the memory features of the language, you need to precise it by changing the signature of _start to _start_mem.
+```asm
+# From:
+# _start:
+# to:
+_start_mem:
+    [1]     <- 0    mov eax self then LEFT and bar
+    [0]     <- self then RIGHT and bar
+```
+You also need to start your inputs for your machine with a blank as it will be used to return to the start after initializing the memory.
 
 ##### mov
 
@@ -181,7 +194,7 @@ foo:
 As for mov, a subroutine is generated to compare with the input value.
 
 ### Comments
-Comments are defined by the character '#'.
+Comments are defined by the character '#'. Therefor, it is impossible to use it in an alphabet as it would comment out the end of the alphabet.
 For example:
 ```asm
 # This a one line comment.
