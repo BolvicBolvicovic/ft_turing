@@ -220,7 +220,7 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                         starts_at = -1;
                         definition = [
                                 ({
-                                        inputs = Inputs blank;
+                                        inputs = Inputs "#";
                                         write  = Write "self";
                                         next   = Normal (Null, Routine (Action "RIGHT", Callee "reach_mem_start"))
                                 }, -1);
@@ -458,22 +458,6 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                                 ({
                                         inputs = Inputs blank;
                                         write  = Write "0";
-                                        next   = Normal (Null, Routine (Action "LEFT", Callee "back_mem_start"))
-                                }, -1);
-                        ]
-                };
-                {
-                        name = "back_mem_start";
-                        starts_at = -1;
-                        definition = [
-                                ({
-                                        inputs = Inputs sub_alpha;
-                                        write  = Write "self";
-                                        next   = Normal (Null, Routine (Action "LEFT", Callee "back_mem_start"))
-                                }, -1);
-                                ({
-                                        inputs = Inputs blank;
-                                        write  = Write "self";
                                         next   = Normal (Null, Routine (Action "LEFT", Callee "back_prog_start"))
                                 }, -1);
                         ]
@@ -483,7 +467,7 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                         starts_at = -1;
                         definition = [
                                 ({
-                                        inputs = Inputs sub_alpha;
+                                        inputs = Inputs (String.fold_left (fun acc c -> if c = '#' then acc else acc ^ String.make 1 c) "" sub_alpha);
                                         write  = Write "self";
                                         next   = Normal (Null, Routine (Action "LEFT", Callee "back_prog_start"))
                                 }, -1);
@@ -495,14 +479,74 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                         ]
                 };
         ] ope in
-        (* TODO: build the memmove paterns
+        (* TODO: build the memmove paterns -> issue with Eq to be solved
         let build_funcs func =
                 let func_def_begin = List.map (fun (line, i) -> match line.next with
                         | Normal (Null, _) -> (line, i)
-                        | Normal (Subroutine (Callee c0, Register r, Null), Routine (Action a, Callee c1)) ->
-                        | Normal (Subroutine (Callee c0, Register r, ipt), Routine (Action a, Callee c1)) ->
-                        | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) ->
+                        | Normal (Subroutine (Callee c0, Register r, Null), Routine (Action a, Callee c1)) -> (
+                                let w = match line.write with Write str -> str | _ -> "" in
+                                { 
+                                        inputs = line.inputs;
+                                        write = Write "#";
+                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r)))}, i)
+                        | Normal (Subroutine (Callee c0, Register r, Int nb), Routine (Action a, Callee c1)) -> (
+                                let w = match line.write with Write str -> str | _ -> "" in
+                                { 
+                                        inputs = line.inputs;
+                                        write = Write "#";
+                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb)))}, i)
+                        | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) -> (
+                                let w = match line.write with Write str -> str | _ -> "" in
+                                { 
+                                        inputs = line.inputs;
+                                        write = Write "#";
+                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb)))}, i)
+                        | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
                 ) func.definition in
+                let func_def_end = 
+                        let aux_map = List.map (fun (line, i) -> match line.next with
+                                | Normal (Null, _) -> [(line, i)]
+                                | Normal (Subroutine (Callee c0, Register r, _), Routine (Action a, Callee c1)) -> [(
+                                        { 
+                                                inputs = Inputs "#";
+                                                write = line.write;
+                                                next = Normal (Null, Routine (Action a, Callee c1))}, i)]
+                                | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) ->
+                                        [({ 
+                                                inputs = Inputs "#";
+                                                write = line.write;
+                                                next = Normal (Null, Routine (Action a1, Callee c1))}, i);
+                                        ({
+                                                inputs = Inputs "#";
+                                                write = line.write;
+                                                next = Normal (Null, Routine (Action a2, Callee c2))}, i);
+                                        ]
+                                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
+                        ) func.definition in (List.hd aux_map, List.hd (List.tl aux_map)) in
+                let (func_name_end1, func_name_end2) = if List.is_empty func_def_end2 then (func.name, "") else (func.name ^ ":1", func.name ^ ":2") in
+                let func_def_reach_reg = 
+                        let aux_map = List.map (fun (line, i) -> match line.next with
+                                | Normal (Null, _) -> [(line, i)]
+                                | Normal (Subroutine (Callee c0, Register r, _), Routine (Action a, Callee c1)) -> [(
+                                        { 
+                                                inputs = Inputs "#";
+                                                write = line.write;
+                                                next = Normal (Null, Routine (Action a, Callee c1))}, i)]
+                                | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) ->
+                                        [({ 
+                                                inputs = Inputs "#";
+                                                write = line.write;
+                                                next = Normal (Null, Routine (Action a1, Callee c1))}, i);
+                                        ({
+                                                inputs = Inputs "#";
+                                                write = line.write;
+                                                next = Normal (Null, Routine (Action a2, Callee c2))}, i);
+                                        ]
+                                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
+                        ) func.definition in (List.hd aux_map, List.hd (List.tl aux_map)) in
+                
+                
+        *)
 
         let generate_memmove funcs = List.map (fun func -> 
                 if List.exists (fun (line, _) -> match line.next with 
@@ -513,7 +557,6 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                         build_funcs func
                 else [func]
         ) funcs |> List.concat in
-        *)
         let updated_parsed_operator = if mem_opt.(0) then (*generate_memmove parsed_operator |>*) init_mem parsed_operator else parsed_operator in
 
         (file_name, updated_alphabet, updated_parsed_operator)
