@@ -118,7 +118,7 @@ foo:
 
 ### Registers
 
-There are 4 registers of 32 bits encoded in hexadecimal: eax, ebx, ecx, edx.
+There are 4 registers of 32 bits encoded in hexadecimal: eax, ebx, ecx, edx. (The maximum value that can be stored is 65535 in decimal and is unsigned)
 You can use a subroutine to read/write them.
 Avoid to use them since it will significantly increase the time complexity of your program.
 You can also store and compare integers. You can perform operations on them. Because registers are encoded in hexadecimal, integers are too.
@@ -133,8 +133,12 @@ foo:
 
 #### self
 
-The "self" keyword is a substitution of the input character. It is necessary for a line that matches on different inputs.
-Can also be used to modify / compare with a register.
+The "self" keyword is a substitution of the input character for the write. It is useful for states that have many input and read-only.
+
+#### any
+
+The "any" keyword is a substitution for the entire alphabet. It is useful for states that have one line and that take the entire alphabet as input.
+Note that if you write some lines for special cases under the "any" line then they will overwrite the "any" statement.
 
 #### assignment then... and...
 
@@ -145,6 +149,7 @@ Though, this syntax is mandatory for most lines of codes. See next section for s
 
 Using these keywords has huge overhead. The reason is that it has to interact with another tape (the memory tape).
 Since we need to simulate this other tape, this operation is increasing the amount of actions that have to be done by a lot.
+At the moment, they cannot be combined with self.
 
 ##### Special _start_mem
 
@@ -157,7 +162,6 @@ _start_mem:
     [1]     <- 0    mov eax self then LEFT and bar
     [0]     <- self then RIGHT and bar
 ```
-You also need to start your inputs for your machine with a blank as it will be used to return to the start after initializing the memory.
 
 ##### mov
 

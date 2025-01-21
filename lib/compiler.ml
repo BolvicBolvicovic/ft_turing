@@ -131,7 +131,7 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                                                         | _      -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ word ^ "' should be either an Action or a Register."))
                                                 )
                                                 | 5 -> if (String.starts_with ~prefix:"int(" word && String.ends_with ~suffix:")" word) then
-                                                                Int (String.sub  word (String.index word '(') (String.rindex word ')' - String.index word '('))
+                                                                Int (String.sub  word (String.index word '(' + 1) (String.rindex word ')' - String.index word '(' - 1))
                                                         else if word = "self" || (String.length word = 1 && String.contains alphabet word.[0]) then
                                                                 Inputs word
                                                         else if word = "and" || word = "then" then
@@ -467,86 +467,656 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                         starts_at = -1;
                         definition = [
                                 ({
-                                        inputs = Inputs (String.fold_left (fun acc c -> if c = '#' then acc else acc ^ String.make 1 c) "" sub_alpha);
+                                        inputs = Inputs (String.fold_left (fun acc c -> if c = '#' then acc else acc ^ String.make 1 c) "" updated_alphabet);
                                         write  = Write "self";
                                         next   = Normal (Null, Routine (Action "LEFT", Callee "back_prog_start"))
                                 }, -1);
                                 ({
-                                        inputs = Inputs blank;
+                                        inputs = Inputs "#";
                                         write  = Write "self";
                                         next   = Normal (Null, Routine (Action "RIGHT", Callee "_start_mem"))
                                 }, -1);
                         ]
                 };
         ] ope in
-        (* TODO: build the memmove paterns -> issue with Eq to be solved
+        (* TODO: build the memmove paterns -> issue with Eq to be solved *)
         let build_funcs func =
                 let func_def_begin = List.map (fun (line, i) -> match line.next with
                         | Normal (Null, _) -> (line, i)
-                        | Normal (Subroutine (Callee c0, Register r, Null), Routine (Action a, Callee c1)) -> (
+                        | Normal (Subroutine (Callee c0, Register r, _), Routine (Action a, Callee c1)) ->
                                 let w = match line.write with Write str -> str | _ -> "" in
-                                { 
+                                let int_value = match line.next with 
+                                        | Normal (Subroutine (_, _, Int v), _) -> v
+                                        | _ -> "" 
+                                in 
+                                ({ 
                                         inputs = line.inputs;
                                         write = Write "#";
-                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r)))}, i)
-                        | Normal (Subroutine (Callee c0, Register r, Int nb), Routine (Action a, Callee c1)) -> (
+                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value)))
+                                }, i);
+                        | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) ->
                                 let w = match line.write with Write str -> str | _ -> "" in
-                                { 
+                                ({ 
                                         inputs = line.inputs;
                                         write = Write "#";
-                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb)))}, i)
-                        | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) -> (
-                                let w = match line.write with Write str -> str | _ -> "" in
-                                { 
-                                        inputs = line.inputs;
-                                        write = Write "#";
-                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb)))}, i)
+                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb)))
+                                }, i);
                         | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
-                ) func.definition in
-                let func_def_end = 
-                        let aux_map = List.map (fun (line, i) -> match line.next with
-                                | Normal (Null, _) -> [(line, i)]
-                                | Normal (Subroutine (Callee c0, Register r, _), Routine (Action a, Callee c1)) -> [(
-                                        { 
-                                                inputs = Inputs "#";
-                                                write = line.write;
-                                                next = Normal (Null, Routine (Action a, Callee c1))}, i)]
-                                | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) ->
-                                        [({ 
-                                                inputs = Inputs "#";
-                                                write = line.write;
-                                                next = Normal (Null, Routine (Action a1, Callee c1))}, i);
-                                        ({
-                                                inputs = Inputs "#";
-                                                write = line.write;
-                                                next = Normal (Null, Routine (Action a2, Callee c2))}, i);
+                ) func.definition  in
+                let func_begin = { name = func.name; starts_at = func.starts_at; definition = func_def_begin; } in
+                let alphabet_without_tag = String.fold_left (fun acc c -> if c = '#' then acc else acc ^ String.make 1 c) "" updated_alphabet in
+                let funcs_subroutines = List.map (fun (line, i) -> 
+                        let w = match line.write with Write str -> str | _ -> "" in
+                        match line.next with
+                        | Normal (Subroutine (Callee c0, Register r, _), Routine (Action a, Callee c1)) -> 
+                                let int_value = match line.next with 
+                                        | Normal (Subroutine (_, _, Int v), _) -> 
+                                                if String.for_all (String.contains "0123456789abcdef") v then 
+                                                        v 
+                                                else 
+                                                        raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ v ^ "' is not a valid hexa. Hexa needs to be of the form 0000. Example: 04a6"))
+                                        | _ -> "" 
+                                in 
+                                let register = match r with 
+                                        | "eax" -> 'A'
+                                        | "ebx" -> 'B'
+                                        | "ecx" -> 'C'
+                                        | "edx" -> 'D'
+                                        | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ r ^ "' is not a valid register."))
+                                in 
+                                let alphabet_without_register = String.fold_left (fun acc c -> if c = register then acc else acc ^ String.make 1 c) "" updated_alphabet in
+                                let func_sub_heart = match c0 with 
+                                        | "inc" -> [
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_begin";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write "self";
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_1")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_1";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write "self";
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_2")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_2";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write "self";
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_inc")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_inc";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0";
+                                                                        write = Write "1";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "1";
+                                                                        write = Write "2";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "2";
+                                                                        write = Write "3";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "3";
+                                                                        write = Write "4";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "4";
+                                                                        write = Write "5";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "5";
+                                                                        write = Write "6";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "6";
+                                                                        write = Write "7";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "7";
+                                                                        write = Write "8";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "8";
+                                                                        write = Write "9";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "9";
+                                                                        write = Write "a";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "a";
+                                                                        write = Write "b";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "b";
+                                                                        write = Write "c";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "c";
+                                                                        write = Write "d";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "d";
+                                                                        write = Write "e";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "e";
+                                                                        write = Write "f";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "f";
+                                                                        write = Write "0";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_inc")))
+                                                                }, -1);
+                                                        ]
+                                                };
                                         ]
-                                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
-                        ) func.definition in (List.hd aux_map, List.hd (List.tl aux_map)) in
-                let (func_name_end1, func_name_end2) = if List.is_empty func_def_end2 then (func.name, "") else (func.name ^ ":1", func.name ^ ":2") in
-                let func_def_reach_reg = 
-                        let aux_map = List.map (fun (line, i) -> match line.next with
-                                | Normal (Null, _) -> [(line, i)]
-                                | Normal (Subroutine (Callee c0, Register r, _), Routine (Action a, Callee c1)) -> [(
-                                        { 
-                                                inputs = Inputs "#";
-                                                write = line.write;
-                                                next = Normal (Null, Routine (Action a, Callee c1))}, i)]
-                                | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) ->
-                                        [({ 
-                                                inputs = Inputs "#";
-                                                write = line.write;
-                                                next = Normal (Null, Routine (Action a1, Callee c1))}, i);
-                                        ({
-                                                inputs = Inputs "#";
-                                                write = line.write;
-                                                next = Normal (Null, Routine (Action a2, Callee c2))}, i);
+                                        | "dec" -> [
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_begin";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write "self";
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_1")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_1";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write "self";
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_2")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_2";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write "self";
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_inc")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_inc";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0";
+                                                                        write = Write "f";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_dec")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "1";
+                                                                        write = Write "0";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "2";
+                                                                        write = Write "1";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "3";
+                                                                        write = Write "2";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "4";
+                                                                        write = Write "3";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "5";
+                                                                        write = Write "4";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "6";
+                                                                        write = Write "5";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "7";
+                                                                        write = Write "6";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "8";
+                                                                        write = Write "7";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "9";
+                                                                        write = Write "8";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "a";
+                                                                        write = Write "9";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "b";
+                                                                        write = Write "a";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "c";
+                                                                        write = Write "b";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "d";
+                                                                        write = Write "c";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "e";
+                                                                        write = Write "d";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                                ({ 
+                                                                        inputs = Inputs "f";
+                                                                        write = Write "e";
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                        ]
+                                                };
                                         ]
-                                | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
-                        ) func.definition in (List.hd aux_map, List.hd (List.tl aux_map)) in
+                                        | "mov" -> [
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_begin";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write (String.make 1 int_value.[0]);
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_1")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_1";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write (String.make 1 int_value.[1]);
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_2")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_2";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write (String.make 1 int_value.[2]);
+                                                                        next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_3")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                                {
+                                                        name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_3";
+                                                        starts_at = -1;
+                                                        definition = [
+                                                                ({ 
+                                                                        inputs = Inputs "0123456789abcdef";
+                                                                        write = Write (String.make 1 int_value.[3]);
+                                                                        next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                                }, -1);
+                                                        ]
+                                                };
+                                        ]
+                                        | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ r ^ "' is not a valid register."))
+                                in 
+                                let func_sub_base = [
+                                        {
+                                                name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_register;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value)))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 register);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_begin")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return" ;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs "#";
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return_fw")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_tag;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_return_fw" ;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_tag;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_returned")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a ^ "_" ^ c1 ^ ":" ^ c0 ^ "_" ^ r ^ int_value ^ "_returned";
+                                                starts_at = -1;
+                                                definition = [({
+                                                        inputs = Inputs "#";
+                                                        write = line.write;
+                                                        next = Normal (Null, Routine (Action a, Callee c1))
+                                                }, i);]
+                                        }
+                                ] in
+                                List.append func_sub_base func_sub_heart
+                        | Eq (Subroutine (Callee c0, Register r, Int nb), Eq_res bool , Routine (Action a1, Callee c1), Routine (Action a2, Callee c2)) ->
+                                let int_value =
+                                        if String.for_all (String.contains "0123456789abcdef") nb then 
+                                                nb
+                                        else 
+                                                raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ nb ^ "' is not a valid hexa. Hexa needs to be of the form 0000. Example: 04a6"))
+                                in 
+                                let alphabet_without_0 = String.fold_left (fun acc c -> if c = int_value.[0] then acc else acc ^ String.make 1 c) "" updated_alphabet in
+                                let alphabet_without_1 = String.fold_left (fun acc c -> if c = int_value.[1] then acc else acc ^ String.make 1 c) "" updated_alphabet in
+                                let alphabet_without_2 = String.fold_left (fun acc c -> if c = int_value.[2] then acc else acc ^ String.make 1 c) "" updated_alphabet in
+                                let alphabet_without_3 = String.fold_left (fun acc c -> if c = int_value.[3] then acc else acc ^ String.make 1 c) "" updated_alphabet in
+                                let register = match r with 
+                                        | "eax" -> 'A'
+                                        | "ebx" -> 'B'
+                                        | "ecx" -> 'C'
+                                        | "edx" -> 'D'
+                                        | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ r ^ "' is not a valid register."))
+                                in 
+                                let the_bool = if ":true" = bool then true else if ":false" = bool then false else raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ nb ^ "' is not a valid bool. Bool needs to be :true or :false")) in
+                                let alphabet_without_register = String.fold_left (fun acc c -> if c = register then acc else acc ^ String.make 1 c) "" updated_alphabet in
+                                let eq_func_base = [
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_register;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb)))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 register);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_begin")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_true" ;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs "#";
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_fw_true")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_tag;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_true" )))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_fw_true" ;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_tag;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_returned_true")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_false" ;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs "#";
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_fw_false")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_tag;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_false" )))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_return_fw_false" ;
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_tag;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_returned_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_returned_true";
+                                                starts_at = -1;
+                                                definition = [({
+                                                        inputs = Inputs "#";
+                                                        write = line.write;
+                                                        next = Normal (Null, Routine (Action a1, Callee c1))
+                                                }, i);]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ nb ^ "_returned_false";
+                                                starts_at = -1;
+                                                definition = [({ 
+                                                        inputs = Inputs "#";
+                                                        write = line.write;
+                                                        next = Normal (Null, Routine (Action a2, Callee c2))
+                                                }, i);]
+                                        };
+                                ] in
+                                let eq_func_bool = if the_bool then [
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_begin";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[0]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_1")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_0;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_1";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[1]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_2")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_1;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_2";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[2]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_3")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_2;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_3";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[3]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_true")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_3;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                ] else [
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_begin";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_0;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_1")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[0]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_1";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_1;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_2")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[1]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_2";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_2;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "RIGHT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_3")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[2]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                        {
+                                                name = w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_3";
+                                                starts_at = -1;
+                                                definition = [
+                                                        ({ 
+                                                                inputs = Inputs alphabet_without_3;
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_true")))
+                                                        }, -1);
+                                                        ({ 
+                                                                inputs = Inputs (String.make 1 int_value.[3]);
+                                                                write = Write "self";
+                                                                next = Normal (Null, Routine (Action "LEFT", Callee (w ^ "_" ^ a1 ^ "_" ^ c1 ^ "_or_" ^ a2 ^ "_" ^ c2 ^ "_if_" ^ bool ^ ":" ^ c0 ^ "_" ^ r ^ "_" ^ int_value ^ "_return_false")))
+                                                        }, -1);
+                                                ]
+                                        };
+                                ] in List.append eq_func_base eq_func_bool
+                        | _ -> []
+                        ) func.definition |> List.concat in
+                func_begin :: funcs_subroutines in
                 
                 
-        *)
 
         let generate_memmove funcs = List.map (fun func -> 
                 if List.exists (fun (line, _) -> match line.next with 
@@ -557,16 +1127,20 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                         build_funcs func
                 else [func]
         ) funcs |> List.concat in
-        let updated_parsed_operator = if mem_opt.(0) then (*generate_memmove parsed_operator |>*) init_mem parsed_operator else parsed_operator in
+        let updated_parsed_operator = if mem_opt.(0) then generate_memmove parsed_operator |> init_mem else parsed_operator in
 
         (file_name, updated_alphabet, updated_parsed_operator)
 
 
 
 
-let to_transitions (line, i) =
+let to_transitions (line, i) alphabet =
         let inputs = match line.inputs with
-                | Inputs str -> String.fold_left (fun acc c -> String.make 1 c :: acc ) [] str |> List.rev
+                | Inputs str -> 
+                        if str = "any" then
+                                List.fold_left (fun acc c -> String.make 1 c :: acc ) [] alphabet
+                        else 
+                                String.fold_left (fun acc c -> String.make 1 c :: acc ) [] str |> List.rev
                 | _ -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": Incorrect input"))
         in
         let state = match line.next with 
@@ -586,11 +1160,11 @@ let to_transitions (line, i) =
 let parse_func as_funcs alphabet = 
         let folded_alphabet = String.fold_left (fun acc c -> c :: acc) [] alphabet in
         List.map (fun func -> (func.name, List.concat (
-                let initial_transistions = List.map to_transitions func.definition in
+                let initial_transistions = List.map (fun def -> to_transitions def folded_alphabet) func.definition in
                 let used_inputs = List.map (fun (line, i) -> match line.inputs with 
                         | Inputs str -> (
                                 let inputs = String.fold_left (fun acc c -> c :: acc ) [] str |> List.rev in
-                                if List.length (List.filter (fun c -> not (String.contains alphabet c)) inputs ) = 0 then
+                                if List.length (List.filter (fun c -> not (String.contains alphabet c)) inputs ) = 0 || str = "any" then
                                         inputs
                                 else
                                         raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": one of '" ^ str ^ "' is not in alphabet"))

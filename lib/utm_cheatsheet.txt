@@ -1,0 +1,57 @@
+A UTM is defined as this U(M(x)) == M(x) with U = UTM, M = a Turing Machine and x = an input for this machine.
+  
+Alphabet for a UTM = [ ">", "0", "1", ";", ",", "(", ")", "." ]
+
+Alphabet for M = [M] and can be anything within a defined set of characters.
+States of M = [Q] with state one being Q1
+Description of transitions = D with one transition = ( ( read, current_state ), ( write, to_state, ACTION ) )
+
+The input (encoded in binary) for a UTM can be : len([M]), len([Q]), D, x.
+
+This UTM will be 3-tape Turing Machine.
+1. Read-Only input take.
+2. Work tape. Contains the current configuration of M.
+	- configuration is encoded like this (w, q, u) with w and q being strings and q is the cursor.
+3. Output or Counter
+
+Step 0 	 -> Evaluate is the string code for M is a valid TM. If it does not, halt with error.
+Step 0.5 -> Read M input, produce initial configuration and move cursors to the appropriate positions. (> i in binary, Qi in binary, x in binary)
+Now we describe how to simulate one state of M(x):
+Step 1 	 -> Scanright across tape 2 until finding the binary description of a state.
+	    If halting state, then U should also halt.
+	    If you need to output, then write on the third tape the output without the configuration around (and translate?).
+Step 2 	 -> It moves backward twice to detect the cursor symbol.
+Step 3 	 -> With symbol and state detected, move the input tape right in search of a matching state.
+Step 4 	 -> If it finds a matching state, it moves backward twice to check if the symbol matches. If it does not match step 3 else step 5.
+Step 5 	 -> Edit the configuration.
+	- Example of how it looks like:
+	tape 1 = ...((read, state),(write, to_state, ACTION))...
+	                  ^
+	tape 2 = ...(start_of_string read_last_symbol, state, other_string)...
+	                     	  ^
+	Need to replace read with write and state with to_state.
+	For move right: tape 2 <- ...(start_of_string write, to_state, first_char other_string)...
+	For move left : tape 2 <- ...(start_of_string new_last_char write, to_state, other_string)...
+	Then rearrange based on ACTION.
+		- if ACTION = 0 then done
+		- if ACTION = 1 then 
+			if there is an available character
+				M cursor moves right -> 
+					swap coma next to write    with first_char;
+					swap coma next to to_state with to_state;
+			else
+				create space for it ->
+					move cursor to coma next to write;
+					run the subroutine an appropriate number of time;
+		- if ACTION = -1 then
+			M cursor moves left ->
+				swap coma next to to_state with write;
+				swap coma next to write    with to_state;
+Step 6 	 -> Move cursor of input take back to the begining of the transition function by detecting three "(" in a row.
+	    Move config tape cursor left to cursor symbol.
+
+To have a finite amount of states and still count, use the third tape to act as a counter.
+Before the computation begins, first compute the log2(len([M]) + len([Q]) + 3).
+Then print that many 0 on this third tape.
+tape 3 = ...0000000;000000>
+Then I compare left with right. If left is longer then I have a state.

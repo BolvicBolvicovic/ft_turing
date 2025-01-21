@@ -76,7 +76,7 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                 else
                         let (new_input, new_state, new_head) = process str_input state head in
                         compute new_input new_state new_head
-        let execute str_input = compute str_input initial 0
+        let execute str_input = if List.exists (fun str -> str = "_start_mem") states then compute ("#" ^ str_input) initial 0 else compute str_input initial 0
         let print_machine () =
                 print_endline ("********************************************************************************");
                 print_endline ("*                                                                              *");
