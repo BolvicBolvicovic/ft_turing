@@ -62,7 +62,10 @@ let to_list file_name =
         in
         let (alphabet, _) = List.hd trimmed_file in
         let parsed_alphabet = String.sub alphabet (String.index alphabet '[' + 1) (String.rindex alphabet ']' - String.index alphabet '[' - 1) in
-        (file_name, parsed_alphabet, List.tl trimmed_file)
+        if String.length parsed_alphabet = 0 then
+                raise (Invalid_argument ("Error in file " ^ file_name ^ ".s: alphabet is empty."))
+        else
+                (file_name, parsed_alphabet, List.tl trimmed_file |> List.filter (fun (str, _) -> str <> ""))
 
 let to_funcs (file_name, alphabet, trimmed_file) =
         let mem_opt = if 
@@ -73,14 +76,14 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                 then [|true|] else [|false|] in
         let func_names = List.filter (fun (line, _) -> String.ends_with ~suffix:":" line) trimmed_file in
         let split_list_on_func_names list =
-                let rec tail acc current = function
+                let rec aux acc current = function
                         | [] -> List.rev (if List.is_empty current then acc else (List.rev current :: acc))
                         | h :: t ->
                                 if String.ends_with ~suffix:":" (fst h) then 
-                                        if List.is_empty current then tail acc [] t else tail (List.rev current :: acc) [] t
+                                        if List.is_empty current then aux acc [] t else aux (List.rev current :: acc) [] t
                                 else
-                                        tail acc (h :: current) t
-                in tail [] [] list
+                                        aux acc (h :: current) t
+                in aux [] [] list
         in
         let parsed_func = try
                 let parsed_func = trimmed_file 
@@ -88,12 +91,6 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                         |> List.fold_left2 (fun acc name definition -> (name, definition) :: acc) [] func_names
                 in List.rev parsed_func
         with e ->
-                print_endline "func_names:";
-                func_names |> List.iter (fun (line, i) -> print_endline ("At line " ^ string_of_int i ^ ": " ^ line));
-                print_endline "parsed_func:";
-                split_list_on_func_names trimmed_file
-                        |> List.iter
-                                (fun list -> print_endline "def"; List.iter (fun (line, i) -> print_endline ("At line " ^ string_of_int i ^ ": " ^ line)) list);
                 print_endline "Number of function name and function definition do not match.";
                 print_endline "Or two function name follow each other";
                 raise e
@@ -187,17 +184,29 @@ let to_funcs (file_name, alphabet, trimmed_file) =
                                 }
                                 | 9 -> {
                                         inputs = arr.(0);
-                                        write  = arr.(2);
+                                        write  = 
+                                                if arr.(2) = Write "self" then
+                                                        raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": 'self' cannot be used when a memory instruction is also used."))
+                                                else
+                                                        arr.(2);
                                         next   = Normal (Subroutine (arr.(3), arr.(4), Null), Routine (arr.(6), arr.(8)));
                                 }
                                 | 10 -> {
                                         inputs = arr.(0);
-                                        write  = arr.(2);
+                                        write  = 
+                                                if arr.(2) = Write "self" then
+                                                        raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": 'self' cannot be used when a memory instruction is also used."))
+                                                else
+                                                        arr.(2);
                                         next   = Normal (Subroutine (arr.(3), arr.(4), arr.(5)), Routine (arr.(7), arr.(9)))
                                 }
                                 | 15 -> {
                                         inputs = arr.(0);
-                                        write  = arr.(2);
+                                        write  = 
+                                                if arr.(2) = Write "self" then
+                                                        raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": 'self' cannot be used when a memory instruction is also used."))
+                                                else
+                                                        arr.(2);
                                         next   = Eq (Subroutine (arr.(3), arr.(4), arr.(5)), arr.(6), Routine (arr.(8), arr.(10)), Routine (arr.(12), arr.(14)))
                                 }
                                 | _      -> raise (Invalid_argument ("Error at line " ^ string_of_int i ^ ": '" ^ string_of_int (List.length definition) ^ "' should not exists."))

@@ -15,7 +15,7 @@
 # Input for language_detector 0^2n
 # 01269-_a(0b-0)b(0c20,2b20,-H61)c(0d00,2c20,-e-1)d(0c20,2d20,-H91)e(0e01,2e21,-b-0)_>0000-
 
-alphabet[.+=-,_()>H0123456789abcdef]
+alphabet[.,_()>H0123456789abcdef+=-]
 
 _start_mem:
         [any]  <- self then RIGHT and _start_mem
@@ -161,7 +161,7 @@ write_state_1:
         [+]    <- + mov ebx int(0010) then RIGHT and write_state_2
         [=]    <- = mov ebx int(0011) then RIGHT and write_state_2
         [-]    <- - mov ebx int(0012) then RIGHT and write_state_2
-        [H]    <- - mov ebx int(6666) then RIGHT and write_state_2
+        [H]    <- H mov ebx int(6666) then RIGHT and write_state_2
 
 write_state_2:
         [a]    <- a mov ecx int(000a) then RIGHT and write_state_3
