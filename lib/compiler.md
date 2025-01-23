@@ -1,7 +1,9 @@
-# Language Definition
+# Turing Machine assembly language
 
 Definition of the "assembly" language for a Turing machine that compiles to the requiered JSON format for ft_turing.
 Note that the project is using the version of the compiler for OCaml 5.3.
+
+![TMs logo](/lib/TMs_logo.svg)
 
 <details>
   <summary>Table of Contents</summary>
@@ -42,9 +44,9 @@ The json machine description is sligthly simplier than a formal description of t
 
 Because the Turing machine that is simulated by the ft_turing program is a single headed and single tape machine,
 it means that each transition (that are just function calls):
-- takes in one parameter (the character under the head)
-- can overwrite that parameter
-- moves the head (LEFT or RIGHT)
+- take in one parameter (the character under the head)
+- overwrite that parameter with a new character or itself
+- move the head (LEFT or RIGHT)
 - call a new state (that is alike a function) that takes in the next character read after the movement.
 
 These two last actions are decided by the function that is called and its parameter.
@@ -73,7 +75,7 @@ a given character under the head of the machine. A transition is defined as foll
 You can direcly write your program in JSON but for bigger programs like a Universal Turing Machine (UTM), you will notice that it is limited.
 The purpose of this assembly language is to ease the writing of any program that can be run by ft_turing.
 
-<p align="right">(<a href="#language-definition">back to top</a>)</p>
+<p align="right">(<a href="#turing-machine-assembly">back to top</a>)</p>
 
 ## Language Specifics
 
@@ -210,5 +212,4 @@ If you want to write multiline comments then use the comment character at the st
 # a multiline
 # comment
 ```
-
-<p align="right">(<a href="#language-definition">back to top</a>)</p>
+<p align="right">(<a href="#turing-machine-assembly">back to top</a>)</p>

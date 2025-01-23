@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="2000" height="2000">
+    <defs>
+        <linearGradient id="hexGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#1E4F8A" stop-opacity="1" />
+            <stop offset="100%" stop-color="#15365E" stop-opacity="1" />
+        </linearGradient>
+        <linearGradient id="lightEffect" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#2A6AB3" stop-opacity="0.3" />
+            <stop offset="50%" stop-color="#1E4F8A" stop-opacity="0.1" />
+            <stop offset="100%" stop-color="#15365E" stop-opacity="0.3" />
+        </linearGradient>
+    </defs>
+    <polygon points="100,30 160,60 160,120 100,150 40,120 40,60" 
+        fill="url(#hexGradient)" />
+    <polygon points="100,30 160,60 160,120 100,150 40,120 40,60" 
+        fill="url(#lightEffect)" opacity="0.5" />
+    <text x="100" y="105" text-anchor="middle" font-family="Arial Black" 
+        font-size="40" font-weight="bold" letter-spacing="-3" fill="#FFFFFF">
+        TMs
+    </text>
+</svg>
+

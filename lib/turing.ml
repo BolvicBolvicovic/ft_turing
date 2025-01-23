@@ -90,7 +90,7 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                         let (new_input, new_state, new_head) = process str_input state head in
                         compute new_input new_state new_head
         let execute str_input =
-                if String.for_all (fun c -> List.exists (fun str -> str.[0] = c) alphabet) str_input then 
+                if String.for_all (fun c -> List.exists (fun str -> c <> blank.[0] && str.[0] = c) alphabet) str_input then 
                         if List.exists (fun str -> str = "_start_mem") states then
                                 compute ("#" ^ str_input) initial 0 else 
                         compute str_input initial 0
@@ -190,6 +190,8 @@ let from_input json_path =
                 StateHashtbl.add ht state transition_array);
         if List.is_empty alphabet then
                 raise (Invalid_argument "Error with JSON file: alphabet is empty.")
+        else if not (List.for_all (fun str -> String.length str = 1) alphabet) then
+                raise (Invalid_argument "Error with JSON file: one letter of the alphabet is larger than one character.")
         else if String.is_empty blank then
                 raise (Invalid_argument "Error with JSON file: blank is empty.")
         else if List.is_empty states then
@@ -198,6 +200,10 @@ let from_input json_path =
                 raise (Invalid_argument "Error with JSON file: initial is empty.")
         else if List.is_empty finals then
                 raise (Invalid_argument "Error with JSON file: finals is empty.")
+        else if not (List.exists states ~f:(fun str -> String.equal str initial)) then
+                raise (Invalid_argument "Error with JSON file: initial is not in states array.")
+        else if not (List.for_all (fun str -> List.exists states ~f:(fun s -> String.equal s str)) finals) then
+                raise (Invalid_argument "Error with JSON file: some of the finals states are not in the states list")
         else
         let module Input : INPUT = struct 
                 type transition = string * string * string * string
