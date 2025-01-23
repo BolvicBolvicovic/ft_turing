@@ -19,40 +19,61 @@ alphabet[.,_()>H0123456789abcdef+=-]
 
 _start_mem:
         [any]  <- self then RIGHT and _start_mem
-        [>]    <- self then RIGHT and first_read
+        [>]    <- _ then RIGHT and reach_input_start_overwrite
 
 reach_input_start:
-        [any]  <- self then LEFT and reach_input_start
-        [_]    <- _ eq ebx int(6666) :true then RIGHT and HALT else RIGHT and reach_cursor
+        [_]    <- _ eq edx int(0001) :true then RIGHT and ERROR else RIGHT and reach_input_start_overwrite_right_0
+        [a]    <- a eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [b]    <- b eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0  
+        [c]    <- c eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0  
+        [d]    <- d eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [e]    <- e eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [f]    <- f eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [0]    <- 0 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [1]    <- 1 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [2]    <- 2 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [3]    <- 3 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [4]    <- 4 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [5]    <- 5 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [6]    <- 6 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [7]    <- 7 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [8]    <- 8 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [9]    <- 9 eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [+]    <- + eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [=]    <- = eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0 
+        [-]    <- - eq edx int(0001) :true then RIGHT and reach_input_start_overwrite_left_0 else RIGHT and reach_input_start_overwrite_right_0
 
-reach_cursor:
-        [any]  <- self then RIGHT and reach_cursor
-        [>]    <- > eq edx int(0000) :true then RIGHT and read else LEFT and read
 
-read:
-        [a]    <- a mov eax int(000a) then LEFT and get_current_state_0
-        [b]    <- b mov eax int(000b) then LEFT and get_current_state_0
-        [c]    <- c mov eax int(000c) then LEFT and get_current_state_0
-        [d]    <- d mov eax int(000d) then LEFT and get_current_state_0
-        [e]    <- e mov eax int(000e) then LEFT and get_current_state_0
-        [f]    <- f mov eax int(000f) then LEFT and get_current_state_0
-        [0]    <- 0 mov eax int(0000) then LEFT and get_current_state_0
-        [1]    <- 1 mov eax int(0001) then LEFT and get_current_state_0
-        [2]    <- 2 mov eax int(0002) then LEFT and get_current_state_0
-        [3]    <- 3 mov eax int(0003) then LEFT and get_current_state_0
-        [4]    <- 4 mov eax int(0004) then LEFT and get_current_state_0
-        [5]    <- 5 mov eax int(0005) then LEFT and get_current_state_0
-        [6]    <- 6 mov eax int(0006) then LEFT and get_current_state_0
-        [7]    <- 7 mov eax int(0007) then LEFT and get_current_state_0
-        [8]    <- 8 mov eax int(0008) then LEFT and get_current_state_0
-        [9]    <- 9 mov eax int(0009) then LEFT and get_current_state_0
-        [+]    <- + mov eax int(0010) then LEFT and get_current_state_0
-        [=]    <- = mov eax int(0011) then LEFT and get_current_state_0
-        [-]    <- - mov eax int(0012) then LEFT and get_current_state_0
+reach_input_start_overwrite_left_0:
+        [any]  <- self then LEFT and reach_input_start_overwrite
+
+reach_input_start_overwrite_right_0:
+        [any]  <- self then RIGHT and reach_input_start_overwrite
+
+reach_input_start_overwrite:
+        [a]    <- > mov eax int(000a) then LEFT and get_current_state_0
+        [b]    <- > mov eax int(000b) then LEFT and get_current_state_0
+        [c]    <- > mov eax int(000c) then LEFT and get_current_state_0
+        [d]    <- > mov eax int(000d) then LEFT and get_current_state_0
+        [e]    <- > mov eax int(000e) then LEFT and get_current_state_0
+        [f]    <- > mov eax int(000f) then LEFT and get_current_state_0
+        [0]    <- > mov eax int(0000) then LEFT and get_current_state_0
+        [1]    <- > mov eax int(0001) then LEFT and get_current_state_0
+        [2]    <- > mov eax int(0002) then LEFT and get_current_state_0
+        [3]    <- > mov eax int(0003) then LEFT and get_current_state_0
+        [4]    <- > mov eax int(0004) then LEFT and get_current_state_0
+        [5]    <- > mov eax int(0005) then LEFT and get_current_state_0
+        [6]    <- > mov eax int(0006) then LEFT and get_current_state_0
+        [7]    <- > mov eax int(0007) then LEFT and get_current_state_0
+        [8]    <- > mov eax int(0008) then LEFT and get_current_state_0
+        [9]    <- > mov eax int(0009) then LEFT and get_current_state_0
+        [+]    <- > mov eax int(0010) then LEFT and get_current_state_0
+        [=]    <- > mov eax int(0011) then LEFT and get_current_state_0
+        [-]    <- > mov eax int(0012) then LEFT and get_current_state_0
 
 get_current_state_0:
         [any]    <- self then LEFT and get_current_state_0
-        [_]      <- self then LEFT and get_current_state_1
+        [_]      <- _    eq ebx int(6666) :true then RIGHT and HALT else LEFT and get_current_state_1
 
 get_current_state_1:
         [any]    <- self then LEFT  and get_current_state_1
@@ -82,27 +103,6 @@ find_state:
 skip_to_next_state:
         [any]  <- self then RIGHT and skip_to_next_state
         [)]    <- self then RIGHT and find_state
-
-first_read:
-        [a]    <- a mov eax int(000a) then LEFT and get_first_state_0
-        [b]    <- b mov eax int(000b) then LEFT and get_first_state_0
-        [c]    <- c mov eax int(000c) then LEFT and get_first_state_0
-        [d]    <- d mov eax int(000d) then LEFT and get_first_state_0
-        [e]    <- e mov eax int(000e) then LEFT and get_first_state_0
-        [f]    <- f mov eax int(000f) then LEFT and get_first_state_0
-        [0]    <- 0 mov eax int(0000) then LEFT and get_first_state_0
-        [1]    <- 1 mov eax int(0001) then LEFT and get_first_state_0
-        [2]    <- 2 mov eax int(0002) then LEFT and get_first_state_0
-        [3]    <- 3 mov eax int(0003) then LEFT and get_first_state_0
-        [4]    <- 4 mov eax int(0004) then LEFT and get_first_state_0
-        [5]    <- 5 mov eax int(0005) then LEFT and get_first_state_0
-        [6]    <- 6 mov eax int(0006) then LEFT and get_first_state_0
-        [7]    <- 7 mov eax int(0007) then LEFT and get_first_state_0
-        [8]    <- 8 mov eax int(0008) then LEFT and get_first_state_0
-        [9]    <- 9 mov eax int(0009) then LEFT and get_first_state_0
-        [+]    <- + mov eax int(0010) then LEFT and get_first_state_0 
-        [=]    <- = mov eax int(0011) then LEFT and get_first_state_0 
-        [-]    <- - mov eax int(0012) then LEFT and get_first_state_0
 
 get_first_state_0:
         [>]    <- self then LEFT and get_first_state_0
@@ -190,13 +190,10 @@ write_state_3:
 
 goto_cursor:
         [any]  <- self then RIGHT and goto_cursor
-        [>]    <- > eq edx int(0000) :true then RIGHT and overwrite_cursor_right_start else LEFT and overwrite_cursor_left_start
+        [>]    <- self then RIGHT and goto_cursor_1
 
-overwrite_cursor_left_start:
-        [any] <- > then RIGHT and try_overwrite_cursor_0
-
-overwrite_cursor_right_start:
-        [any] <- > then LEFT  and try_overwrite_cursor_0
+goto_cursor_1:
+        [any] <- self then LEFT and try_overwrite_cursor_0
 
 try_overwrite_cursor_0:
         [>]    <- > eq ecx int(0000) :true then LEFT and overwrite_cursor_0_0 else LEFT and wait_1

@@ -146,7 +146,7 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                                 ^ List.fold_left 
                                         (fun acc str -> acc ^ (StateHashtbl.find ht_state str) ^ "(" ^ build_transition (StateHashtbl.find transitions str) ^ ")") 
                                         first_state tail_states 
-                                ^ "_>" ^ str_input)
+                                ^ ">" ^ str_input)
                         end
                 else
                         raise (Invalid_argument ("Input for " ^ name ^ " is incorrect. One of the character is not in the alphabet of the machine."))
