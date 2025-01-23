@@ -56,7 +56,7 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                                 blank ^ str_input
                         else str_input in
                 let updated_head = if head = (-1) then 0 else head in
-                let formated_str = "[" ^ (String.fold_left (fun acc element -> acc ^ if String.length acc = updated_head then ("<" ^ String.make 1 element ^ ">") else String.make 1 element) "" updated_input) ^ "]" in
+                let formated_str = "[" ^ (String.fold_left (fun acc element -> acc ^ if String.length acc = updated_head then ("\027[1;96m<\027[0;37m" ^ String.make 1 element ^ "\027[1;96m>\027[0;37m") else String.make 1 element) "" updated_input) ^ "]" in
                 print_string formated_str;
                 let read_head = String.make 1 updated_input.[updated_head] in
                 print_string ("(" ^ state ^ ", " ^ read_head ^ ") -> ");
@@ -98,11 +98,11 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                         raise (Invalid_argument ("Input for " ^ name ^ " is incorrect. One of the character is not in the alphabet of the machine."))
 
         let print_machine () =
-                print_endline ("\027[0;35m================================================================================");
+                print_endline ("\027[1;35m================================================================================");
                 print_newline ();
                 print_endline ("\027[0;37m 	                        " ^ name);
                 print_newline ();
-                print_endline ("\027[0;35m================================================================================\027[0;37m");
+                print_endline ("\027[1;35m================================================================================\027[0;37m");
                 let print_elem str = print_string (str ^ "; ") in
                 print_string "Alphabet: [ "; List.iter print_elem alphabet; print_endline "]";
                 print_string "States  : [ "; List.iter print_elem states; print_endline "]";
@@ -112,7 +112,7 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                         (fun key arr -> Array.iter 
                                 (fun (read, to_state, write, action) -> print_endline ("(" ^ key ^ ", " ^ read ^ ") -> (" ^ to_state ^ ", " ^ write ^ ", " ^ action ^ ")")) arr)
                         transitions;
-                print_endline ("\027[0;35m================================================================================\027[0;37m")
+                print_endline ("\027[1;35m================================================================================\027[0;37m")
 
         let compile str_input = 
                 if String.for_all (fun c -> List.exists (fun str -> str.[0] = c) alphabet) str_input then 
