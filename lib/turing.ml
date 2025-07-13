@@ -91,11 +91,12 @@ module Make : functor (I: INPUT) -> Machine = functor (I: INPUT) -> struct
                         compute new_input new_state new_head
         let execute str_input =
                 if String.for_all (fun c -> List.exists (fun str -> c <> blank.[0] && str.[0] = c) alphabet) str_input then 
+                        let blank_str = String.make 10 blank.[0] in
                         if List.exists (fun str -> str = "_start_mem") states then
-                                compute ("#" ^ str_input) initial 0 else 
-                        compute str_input initial 0
+                                compute ("#" ^ str_input ^ blank_str) initial 0 else 
+                        compute (str_input ^ blank_str) initial 0
                 else
-                        raise (Invalid_argument ("Input for " ^ name ^ " is incorrect. One of the character is not in the alphabet of the machine."))
+                        raise (Invalid_argument ("Input for " ^ name ^ " is incorrect. One of the character is not in the alphabet of the machine or is the blank character."))
 
         let print_machine () =
                 print_endline ("\027[1;35m================================================================================");
@@ -190,7 +191,7 @@ let from_input json_path =
                 StateHashtbl.add ht state transition_array);
         if List.is_empty alphabet then
                 raise (Invalid_argument "Error with JSON file: alphabet is empty.")
-        else if not (List.for_all (fun str -> String.length str = 1) alphabet) then
+        else if not (List.for_all alphabet ~f:(fun str -> String.length str = 1)) then
                 raise (Invalid_argument "Error with JSON file: one letter of the alphabet is larger than one character.")
         else if String.is_empty blank then
                 raise (Invalid_argument "Error with JSON file: blank is empty.")
@@ -202,7 +203,7 @@ let from_input json_path =
                 raise (Invalid_argument "Error with JSON file: finals is empty.")
         else if not (List.exists states ~f:(fun str -> String.equal str initial)) then
                 raise (Invalid_argument "Error with JSON file: initial is not in states array.")
-        else if not (List.for_all (fun str -> List.exists states ~f:(fun s -> String.equal s str)) finals) then
+        else if not (List.for_all finals ~f:(fun str -> List.exists states ~f:(fun s -> String.equal s str))) then
                 raise (Invalid_argument "Error with JSON file: some of the finals states are not in the states list")
         else
         let module Input : INPUT = struct 
