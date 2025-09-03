@@ -20,6 +20,7 @@ end
 module type Machine = sig
   type transition = string * string * string * string
   type state = string
+  type step = string * state * int
 
   val name : string
   val alphabet : string list
@@ -29,9 +30,11 @@ module type Machine = sig
   val finals : state list
   val transitions : transition array StateHashtbl.t
   val print_machine : unit -> unit
+  val initial_step: string -> step
   val execute : string -> unit
   val compute : string -> state -> int -> unit
-  val process : string -> state -> int -> string * state * int
+  val compute_next_step : string -> state -> int -> step
+  val process : string -> state -> int -> bool -> step
   val compile : string -> unit
 end
 
@@ -42,6 +45,7 @@ functor
   struct
     type transition = string * string * string * string
     type state = string
+    type step = string * state * int
 
     let name = I.name
     let alphabet = I.alphabet
@@ -51,7 +55,25 @@ functor
     let finals = I.finals
     let transitions = I.transitions
 
-    let process str_input state head =
+    let initial_step str_input =
+      if
+        String.for_all
+          (fun c ->
+            List.exists (fun str -> c <> blank.[0] && str.[0] = c) alphabet)
+          str_input
+      then
+        let blank_str = String.make 10 blank.[0] in
+        if List.exists (fun str -> str = "_start_mem") states then
+          (("#" ^ str_input ^ blank_str), initial, 0)
+        else ((str_input ^ blank_str), initial, 0)
+      else
+        raise
+          (Invalid_argument
+             ("Input for " ^ name
+            ^ " is incorrect. One of the character is not in the alphabet of \
+               the machine or is the blank character."))
+
+    let process str_input state head debug =
       let updated_input =
         if head = String.length str_input then str_input ^ blank
         else if head = -1 then blank ^ str_input
@@ -71,9 +93,9 @@ functor
             "" updated_input
         ^ "]"
       in
-      print_string formated_str;
+      if not debug then print_string formated_str;
       let read_head = String.make 1 updated_input.[updated_head] in
-      print_string ("(" ^ state ^ ", " ^ read_head ^ ") -> ");
+      if not debug then print_string ("(" ^ state ^ ", " ^ read_head ^ ") -> ");
       let state_transition = StateHashtbl.find transitions state in
       let _, new_state, write, action =
         match
@@ -101,15 +123,19 @@ functor
         else if new_state = "ERROR" then "\027[0;31mERROR\027[0;37m"
         else new_state
       in
-      print_endline ("(" ^ formated_state ^ ", " ^ write ^ ", " ^ action ^ ")");
+      if not debug then print_endline ("(" ^ formated_state ^ ", " ^ write ^ ", " ^ action ^ ")");
       (new_str, new_state, new_head)
 
     let rec compute str_input state head =
       if List.exists (fun e -> e = state) finals then
         print_endline ("Output: " ^ str_input)
       else
-        let new_input, new_state, new_head = process str_input state head in
+        let new_input, new_state, new_head = process str_input state head false in
         compute new_input new_state new_head
+
+    let compute_next_step str_input state head =
+      let new_input, new_state, new_head = process str_input state head true in
+      (new_input, new_state, new_head)
 
     let execute str_input =
       if
@@ -159,7 +185,6 @@ functor
         transitions;
       print_endline
         "\027[1;35m================================================================================\027[0;37m"
-
     let compile str_input =
       if
         String.for_all

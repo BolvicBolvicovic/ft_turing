@@ -44,6 +44,16 @@ let () =
           let module Input = (val input_module : Turing.INPUT) in
           let module Machine = Turing.Make (Input) in
           Machine.compile Sys.argv.(3)
+        else if Sys.argv.(1) = "--debug" || Sys.argv.(1) = "-d" then (
+          if String.ends_with ~suffix:".json" Sys.argv.(2) = true then (
+            let input_module = Turing.from_input Sys.argv.(2) in
+            let module Input = (val input_module : Turing.INPUT) in
+            let module Machine = Turing.Make (Input) in
+            Debug.start_debug_mode (module Machine : Turing.Machine) Sys.argv.(3);
+          )
+          else
+            invalid_arg
+              "USAGE: ft_turing [OPTION] machine_name.json 'input_to_machine' ")
         else
           invalid_arg
             "USAGE: ft_turing [OPTION] machine_name.json 'input_to_machine'"

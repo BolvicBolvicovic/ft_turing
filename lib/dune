@@ -1,4 +1,4 @@
 (library
  (name ft_turing)
- (modules turing compiler)
- (libraries core yojson))
+ (modules turing compiler debug)
+ (libraries core yojson dream))
