@@ -55,24 +55,6 @@ functor
     let finals = I.finals
     let transitions = I.transitions
 
-    let initial_step str_input =
-      if
-        String.for_all
-          (fun c ->
-            List.exists (fun str -> c <> blank.[0] && str.[0] = c) alphabet)
-          str_input
-      then
-        let blank_str = String.make 10 blank.[0] in
-        if List.exists (fun str -> str = "_start_mem") states then
-          (("#" ^ str_input ^ blank_str), initial, 0)
-        else ((str_input ^ blank_str), initial, 0)
-      else
-        raise
-          (Invalid_argument
-             ("Input for " ^ name
-            ^ " is incorrect. One of the character is not in the alphabet of \
-               the machine or is the blank character."))
-
     let process str_input state head debug =
       let updated_input =
         if head = String.length str_input then str_input ^ blank
@@ -134,8 +116,32 @@ functor
         compute new_input new_state new_head
 
     let compute_next_step str_input state head =
-      let new_input, new_state, new_head = process str_input state head true in
-      (new_input, new_state, new_head)
+      process str_input state head true
+
+    let initial_step str_input =
+      if
+        String.for_all
+          (fun c ->
+            List.exists (fun str -> c <> blank.[0] && str.[0] = c) alphabet)
+          str_input
+      then
+        let blank_str = String.make 10 blank.[0] in
+        if List.exists (fun str -> str = "_start_mem") states then
+          let rec mem_step (str, state, head) =
+            if state = "_start_mem" then
+              (str, state, head)
+            else
+              mem_step (process str state head true)
+          in
+          mem_step ("#" ^ str_input ^ blank_str, initial, 0)
+        else ((str_input ^ blank_str), initial, 0)
+      else
+        raise
+          (Invalid_argument
+             ("Input for " ^ name
+            ^ " is incorrect. One of the character is not in the alphabet of \
+               the machine or is the blank character."))
+
 
     let execute str_input =
       if

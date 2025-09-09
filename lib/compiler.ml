@@ -2336,6 +2336,8 @@ let parse_func as_funcs alphabet =
                (fun (line, i) ->
                  match line.inputs with
                  | Inputs str ->
+                  if str = "any" then folded_alphabet
+                  else
                      let inputs =
                        String.fold_left (fun acc c -> c :: acc) [] str
                        |> List.rev
