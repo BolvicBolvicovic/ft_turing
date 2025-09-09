@@ -1,4 +1,5 @@
 (library
  (name ft_turing)
  (modules turing compiler debug)
- (libraries core yojson dream))
+ (libraries core yojson dream lwt)
+ (preprocess (pps lwt_ppx)))
