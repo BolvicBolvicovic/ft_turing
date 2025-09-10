@@ -53,18 +53,17 @@ let start_debug_mode (module Machine : Machine) (input : string) =
 
     Dream.get "/run" (fun _ ->
       let rec run_until_breakpoint () =
+          let updated_input, state, head = Machine.compute_next_step current_step.input current_step.state current_step.head in
+          current_step.input <- updated_input;
+          current_step.state <- state;
+          current_step.head <- head;
           if List.exists (fun (s) -> s = current_step.state) Machine.finals
             || List.exists (fun (s, r) -> 
             s = current_step.state
             && r.[0] = current_step.input.[current_step.head]
           ) breakpoints.lines
           then ()
-          else
-            let updated_input, state, head = Machine.compute_next_step current_step.input current_step.state current_step.head in
-            current_step.input <- updated_input;
-            current_step.state <- state;
-            current_step.head <- head;
-            run_until_breakpoint ()
+          else run_until_breakpoint ()
       in
       run_until_breakpoint ();
       Dream.json (step_to_json current_step)
